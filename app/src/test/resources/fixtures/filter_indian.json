@@ -1,0 +1,10 @@
+{
+  "meals": [
+    { "idMeal": "52795", "strMeal": "Chicken Handi", "strMealThumb": "https://www.themealdb.com/images/media/meals/wyxwsp1486979827.jpg" },
+    { "idMeal": "52930", "strMeal": "Chicken Karahi", "strMealThumb": "https://www.themealdb.com/images/media/meals/wuvryu1468232995.jpg" },
+    { "idMeal": "52931", "strMeal": "Kachumber Salad", "strMealThumb": "https://www.themealdb.com/images/media/meals/rxtrst1483567898.jpg" },
+    { "idMeal": "52932", "strMeal": "Goan Fish Curry", "strMealThumb": "https://www.themealdb.com/images/media/meals/qqusvt1511792781.jpg" },
+    { "idMeal": "52933", "strMeal": "Dal Makhani", "strMealThumb": "https://www.themealdb.com/images/media/meals/urxqtw1511792728.jpg" },
+    { "idMeal": "52957", "strMeal": "Prawn & Mango Curry", "strMealThumb": "https://www.themealdb.com/images/media/meals/xxpqsy1511452222.jpg" }
+  ]
+}

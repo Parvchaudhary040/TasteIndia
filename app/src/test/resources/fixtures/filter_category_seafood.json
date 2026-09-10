@@ -1,0 +1,9 @@
+{
+  "meals": [
+    { "idMeal": "52932", "strMeal": "Goan Fish Curry", "strMealThumb": "https://www.themealdb.com/images/media/meals/qqusvt1511792781.jpg" },
+    { "idMeal": "52957", "strMeal": "Prawn & Mango Curry", "strMealThumb": "https://www.themealdb.com/images/media/meals/xxpqsy1511452222.jpg" },
+    { "idMeal": "52815", "strMeal": "Fish Stew with Rouille", "strMealThumb": "https://www.themealdb.com/images/media/meals/vptqpw1511798500.jpg" },
+    { "idMeal": "52816", "strMeal": "Honey Teriyaki Salmon", "strMealThumb": "https://www.themealdb.com/images/media/meals/xxyupu1468262513.jpg" },
+    { "idMeal": "52819", "strMeal": "Cajun spiced fish tacos", "strMealThumb": "https://www.themealdb.com/images/media/meals/uvuyxu1503067369.jpg" }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "meals": [
+    { "idMeal": "52795", "strMeal": "Chicken Handi", "strMealThumb": "https://www.themealdb.com/images/media/meals/wyxwsp1486979827.jpg" },
+    { "idMeal": "52930", "strMeal": "Chicken Karahi", "strMealThumb": "https://www.themealdb.com/images/media/meals/wuvryu1468232995.jpg" },
+    { "idMeal": "52840", "strMeal": "Katsu Chicken curry", "strMealThumb": "https://www.themealdb.com/images/media/meals/vwrpps1503068729.jpg" },
+    { "idMeal": "52846", "strMeal": "Chicken Congee", "strMealThumb": "https://www.themealdb.com/images/media/meals/1529446137.jpg" }
+  ]
+}

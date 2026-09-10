@@ -17,6 +17,13 @@ sealed interface AppError {
     /** Server replied with a non-2xx status. */
     data class Http(val code: Int) : AppError
 
+    /**
+     * A `lookup.php` call succeeded but contained no meal for the requested id. Distinct from
+     * the empty-list case (which is normal for filter/search) because a details screen has
+     * nothing to render without a meal.
+     */
+    data object NotFound : AppError
+
     /** Response body could not be parsed into the expected shape. */
     data object Serialization : AppError
 
