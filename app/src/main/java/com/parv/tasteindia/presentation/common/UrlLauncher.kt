@@ -7,6 +7,7 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.net.toUri
 
 /**
  * Opens external links (source / video) safely:
@@ -39,7 +40,7 @@ fun openExternalUrl(context: Context, url: String) {
 /** Trimmed `http`/`https` [Uri] with a non-blank host, or `null`. */
 fun String.asWebUrlOrNull(): Uri? {
     val candidate = trim().takeIf { it.isNotEmpty() } ?: return null
-    val uri = runCatching { Uri.parse(candidate) }.getOrNull() ?: return null
+    val uri = runCatching { candidate.toUri() }.getOrNull() ?: return null
     return uri.takeIf {
         it.scheme?.lowercase() in setOf("http", "https") && !it.host.isNullOrBlank()
     }
