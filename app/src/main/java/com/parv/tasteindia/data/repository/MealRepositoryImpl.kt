@@ -72,6 +72,11 @@ class MealRepositoryImpl(
     private val inFlightDetails = ConcurrentHashMap<String, Deferred<DataResult<MealDetail>>>()
     private val detailPermits = Semaphore(MAX_CONCURRENT_DETAIL_CALLS)
 
+    // Resolved (already Indian-intersected) id sets, keyed by the filter value. Re-selecting a
+    // filter after "Clear all" is then free, and toggling filters doesn't refetch.
+    private val categoryIdsCache = ConcurrentHashMap<String, Set<String>>()
+    private val ingredientIdsCache = ConcurrentHashMap<String, Set<String>>()
+
     override suspend fun getIndianMeals(forceRefresh: Boolean): DataResult<List<Meal>> {
         if (!forceRefresh) indianMealsCache?.let { return DataResult.Success(it) }
 
@@ -90,11 +95,17 @@ class MealRepositoryImpl(
         }
     }
 
-    override suspend fun getIndianMealIdsForCategory(category: String): DataResult<Set<String>> =
-        intersectWithIndianBase { api.filterByCategory(category) }
+    override suspend fun getIndianMealIdsForCategory(category: String): DataResult<Set<String>> {
+        categoryIdsCache[category]?.let { return DataResult.Success(it) }
+        return intersectWithIndianBase { api.filterByCategory(category) }
+            .also { if (it is DataResult.Success) categoryIdsCache[category] = it.data }
+    }
 
-    override suspend fun getIndianMealIdsForIngredient(ingredient: String): DataResult<Set<String>> =
-        intersectWithIndianBase { api.filterByIngredient(ingredient) }
+    override suspend fun getIndianMealIdsForIngredient(ingredient: String): DataResult<Set<String>> {
+        ingredientIdsCache[ingredient]?.let { return DataResult.Success(it) }
+        return intersectWithIndianBase { api.filterByIngredient(ingredient) }
+            .also { if (it is DataResult.Success) ingredientIdsCache[ingredient] = it.data }
+    }
 
     /** Runs [query], then keeps only the IDs that are also in the Indian base set. */
     private suspend fun intersectWithIndianBase(
