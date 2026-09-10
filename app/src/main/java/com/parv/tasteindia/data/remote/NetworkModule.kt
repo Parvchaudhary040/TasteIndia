@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit
  */
 object NetworkModule {
 
-    private const val BASE_URL = "https://www.themealdb.com/api/json/v1/1/"
+    const val BASE_URL = "https://www.themealdb.com/api/json/v1/1/"
 
     /** Lenient enough for TheMealDB's inconsistent payloads, strict enough to catch shape drift. */
     fun json(): Json = Json {
@@ -25,12 +25,20 @@ object NetworkModule {
         coerceInputValues = true
     }
 
-    fun okHttpClient(enableLogging: Boolean): OkHttpClient =
+    /**
+     * @param isOnline consulted before each request so an offline device fails fast (see
+     *   [ConnectivityInterceptor]) instead of waiting out the connect timeout.
+     */
+    fun okHttpClient(
+        enableLogging: Boolean,
+        isOnline: () -> Boolean = { true },
+    ): OkHttpClient =
         OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
             .callTimeout(20, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
+            .addInterceptor(ConnectivityInterceptor(isOnline))
             .apply {
                 if (enableLogging) {
                     addInterceptor(
@@ -42,10 +50,14 @@ object NetworkModule {
             }
             .build()
 
-    fun retrofit(client: OkHttpClient, json: Json): Retrofit {
+    fun retrofit(
+        client: OkHttpClient,
+        json: Json,
+        baseUrl: String = BASE_URL,
+    ): Retrofit {
         val contentType = "application/json".toMediaType()
         return Retrofit.Builder()
-            .baseUrl(BASE_URL)
+            .baseUrl(baseUrl)
             .client(client)
             .addConverterFactory(json.asConverterFactory(contentType))
             .build()

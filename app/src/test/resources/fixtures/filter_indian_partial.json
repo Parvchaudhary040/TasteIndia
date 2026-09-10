@@ -1,0 +1,8 @@
+{
+  "meals": [
+    { "idMeal": "52807", "strMeal": "Baingan Bharta", "strMealThumb": "https://www.themealdb.com/images/media/meals/urtpqw1487341253.jpg", "strArea": "India" },
+    { "idMeal": "53076", "strMeal": "Bread omelette", "strMealThumb": null, "strArea": "India" },
+    { "idMeal": "52785", "strMeal": "  ", "strMealThumb": "https://www.themealdb.com/images/media/meals/xxx.jpg", "strArea": "India" },
+    { "idMeal": "52964", "strMeal": "Lamb Biryani", "strMealThumb": "", "strArea": "India" }
+  ]
+}

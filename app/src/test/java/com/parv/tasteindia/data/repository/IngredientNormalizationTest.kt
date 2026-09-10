@@ -84,6 +84,22 @@ class IngredientNormalizationTest {
     }
 
     @Test
+    fun `a minimal detail (only id and name) maps without crashing to all-null fields`() {
+        val dto = Fixtures.decode<MealDetailResponseDto>("lookup_minimal.json").meals!!.single()
+
+        val detail = dto.toDomain()
+
+        assertEquals("Bare Bones Dal", detail.name)
+        assertNull(detail.category)
+        assertNull(detail.area)
+        assertNull(detail.instructions)
+        assertNull(detail.thumbnailUrl)
+        assertNull(detail.youtubeUrl) // "" in the fixture -> null
+        assertTrue(detail.tags.isEmpty())
+        assertTrue(detail.ingredients.isEmpty())
+    }
+
+    @Test
     fun `splitTags trims, drops blanks and de-duplicates while keeping order`() {
         assertEquals(listOf("Curry", "Chicken", "Spicy"), splitTags("Curry,Chicken,Spicy"))
         assertEquals(listOf("Curry", "Chicken"), splitTags(" Curry , ,Chicken, Curry "))

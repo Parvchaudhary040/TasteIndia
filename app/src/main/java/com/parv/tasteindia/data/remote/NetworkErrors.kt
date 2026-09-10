@@ -19,6 +19,8 @@ import java.net.UnknownHostException
 fun Throwable.toAppError(): AppError = when (this) {
     is CancellationException -> throw this
 
+    is OfflineException -> AppError.Network
+
     is HttpException -> AppError.Http(code())
 
     // OkHttp's callTimeout throws a bare InterruptedIOException("timeout"); connect/read

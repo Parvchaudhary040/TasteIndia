@@ -89,6 +89,18 @@ class IndianBoundaryIntersectionTest {
     }
 
     @Test
+    fun `partial rows without a usable name are dropped from the base set`() = runTest {
+        val partial = Fixtures.decode<MealListResponseDto>("filter_indian_partial.json")
+        val api = FakeMealApi(areaResponse = partial)
+
+        val result = repository(api).getIndianMeals()
+
+        // fixture has 4 rows; one has a blank strMeal ("  ") and must not appear.
+        val names = (result as DataResult.Success).data.map { it.name }
+        assertEquals(listOf("Baingan Bharta", "Bread omelette", "Lamb Biryani"), names.sorted())
+    }
+
+    @Test
     fun `the Indian base set is fetched from the network only once`() = runTest {
         val api = FakeMealApi(
             areaResponse = indianBase,

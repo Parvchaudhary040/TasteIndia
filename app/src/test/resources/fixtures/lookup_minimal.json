@@ -1,0 +1,17 @@
+{
+  "meals": [
+    {
+      "idMeal": "99999",
+      "strMeal": "Bare Bones Dal",
+      "strCategory": null,
+      "strArea": null,
+      "strInstructions": null,
+      "strMealThumb": null,
+      "strTags": null,
+      "strYoutube": "",
+      "strSource": null,
+      "strIngredient1": null,
+      "strMeasure1": null
+    }
+  ]
+}

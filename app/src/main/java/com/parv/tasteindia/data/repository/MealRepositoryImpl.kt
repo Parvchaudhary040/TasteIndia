@@ -87,7 +87,10 @@ class MealRepositoryImpl(
             when (val response = safeApiCall { api.filterByArea(INDIAN_AREA) }) {
                 is DataResult.Failure -> response
                 is DataResult.Success -> {
-                    val meals = response.data.meals.orEmpty().map { it.toDomain() }
+                    // Partial-data guard: drop rows the UI couldn't render (no id or no name).
+                    val meals = response.data.meals.orEmpty()
+                        .map { it.toDomain() }
+                        .filter { it.id.isNotBlank() && it.name.isNotBlank() }
                     indianMealsCache = meals
                     DataResult.Success(meals)
                 }

@@ -1,6 +1,9 @@
 package com.parv.tasteindia.di
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import androidx.core.content.getSystemService
 import com.parv.tasteindia.BuildConfig
 import com.parv.tasteindia.data.local.TasteIndiaDatabase
 import com.parv.tasteindia.data.remote.MealApi
@@ -34,8 +37,18 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     override val json: Json by lazy { NetworkModule.json() }
 
+    private val connectivityManager: ConnectivityManager? by lazy { appContext.getSystemService() }
+
+    /** True when the active network reports internet capability. */
+    private fun isOnline(): Boolean {
+        val manager = connectivityManager ?: return true // no manager -> don't block requests
+        val network = manager.activeNetwork ?: return false
+        val capabilities = manager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
     override val okHttpClient: OkHttpClient by lazy {
-        NetworkModule.okHttpClient(enableLogging = BuildConfig.DEBUG)
+        NetworkModule.okHttpClient(enableLogging = BuildConfig.DEBUG, isOnline = ::isOnline)
     }
 
     private val retrofit by lazy { NetworkModule.retrofit(okHttpClient, json) }
