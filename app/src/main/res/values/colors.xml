@@ -1,3 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Used only by the OS launch window (windowBackground + Android 12+ splash). -->
+    <color name="splash_background">#FFF8F6</color>
+    <color name="splash_icon_tint">#A5331B</color>
 </resources>

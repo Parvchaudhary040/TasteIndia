@@ -8,6 +8,14 @@ import kotlinx.serialization.Serializable
  */
 sealed interface Destination {
 
+    /** Branded launch screen: the app name, shown briefly then faded out. */
+    @Serializable
+    data object Splash : Destination
+
+    /** One-screen welcome / landing page that leads into the recipe list. */
+    @Serializable
+    data object Welcome : Destination
+
     @Serializable
     data object Recipes : Destination
 

@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
 
-    <style name="Theme.TasteIndia" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+      Launch theme only. The real UI is Compose (TasteIndiaTheme). This just makes the OS launch
+      window and the Android 12+ system splash use the app's background + a heart mark, so the
+      hand-off to the Compose splash screen is seamless. splash_background / splash_icon_tint
+      have -night variants.
+    -->
+    <style name="Theme.TasteIndia" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/splash_background</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="s">@color/splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="s">@drawable/splash_icon</item>
+    </style>
 </resources>

@@ -39,6 +39,8 @@ domain/
   model/       Meal, MealDetail, Ingredient, SortOrder, AppError, DataResult
   repository/   MealRepository, FavouritesRepository (interfaces)
 presentation/
+  splash/      SplashScreen (branded launch, ~3s, fades out)
+  welcome/     WelcomeScreen (one-screen landing page)
   recipes/     RecipesViewModel + immutable RecipesUiState, screen, filter sheet, chips,
                pure applyFilters()
   details/     DetailsViewModel + DetailsUiState, screen
@@ -68,11 +70,18 @@ approach; this is ~60 lines, no annotation processing, and the whole graph is re
 file. Trade‑off: no compile‑time graph validation, manual wiring — fine at this size.
 *Alternative considered:* Hilt — rejected as heavier than the problem and another KSP processor.
 
-**Navigation.** Single‑Activity, type‑safe `@Serializable` routes. `Destination.Details` carries
-**only `mealId: String`** — no `Meal`/`MealDetail` object is ever passed through navigation; the
-detail screen re‑resolves by id (from cache). `RecipesViewModel` is scoped to its
-`NavBackStackEntry`, so Recipes → Details → Back returns to the *same* instance with filters
-intact.
+**Navigation.** Single‑Activity, type‑safe `@Serializable` routes.
+
+Launch flow: **Splash** (the "TasteIndia" wordmark, held ~3s then faded out — picks up
+seamlessly from the Android 12+ system splash, which is themed to the same heart + background)
+→ **Welcome** (a calm one‑screen landing page with one primary action) → **Recipes**. Splash and
+Welcome are each `popUpTo(...) { inclusive = true }`‑popped once left, so Recipes is the
+effective home and Back from it exits the app.
+
+`Destination.Details` carries **only `mealId: String`** — no `Meal`/`MealDetail` object is ever
+passed through navigation; the detail screen re‑resolves by id (from cache). `RecipesViewModel`
+is scoped to its `NavBackStackEntry`, so Recipes → Details → Back returns to the *same* instance
+with filters intact.
 
 ---
 
