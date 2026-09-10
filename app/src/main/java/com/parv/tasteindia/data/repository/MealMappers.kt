@@ -26,7 +26,8 @@ fun MealDetailDto.toDomain(): MealDetail = MealDetail(
     name = strMeal.trim(),
     category = strCategory.cleaned(),
     area = strArea.cleaned(),
-    instructions = strInstructions.cleaned(),
+    // TheMealDB uses CRLF line endings; normalize so Compose renders paragraphs, not boxes.
+    instructions = strInstructions.cleaned()?.replace("\r\n", "\n")?.replace('\r', '\n'),
     thumbnailUrl = strMealThumb.cleaned(),
     tags = splitTags(strTags),
     youtubeUrl = strYoutube.cleaned(),

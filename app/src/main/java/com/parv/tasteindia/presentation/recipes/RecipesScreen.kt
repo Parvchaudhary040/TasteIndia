@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -54,6 +55,9 @@ fun RecipesScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val query by viewModel.queryInput.collectAsStateWithLifecycle()
 
+    // rememberLazyListState is rememberSaveable-backed; NavHost restores it per back-stack
+    // entry, so the scroll position survives Recipes -> Details -> Back.
+    val listState = rememberLazyListState()
     var showFilterSheet by rememberSaveable { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -122,6 +126,7 @@ fun RecipesScreen(
                     } else {
                         RecipeList(
                             items = state.meals,
+                            listState = listState,
                             onMealClick = onMealClick,
                             onToggleFavourite = viewModel::toggleFavourite,
                         )
@@ -197,10 +202,12 @@ private fun ResultCount(count: Int, filtered: Boolean) {
 @Composable
 private fun RecipeList(
     items: List<RecipeListItem>,
+    listState: androidx.compose.foundation.lazy.LazyListState,
     onMealClick: (String) -> Unit,
     onToggleFavourite: (String) -> Unit,
 ) {
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
