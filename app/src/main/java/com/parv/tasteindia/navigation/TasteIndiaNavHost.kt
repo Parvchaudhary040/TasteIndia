@@ -18,7 +18,7 @@ import com.parv.tasteindia.presentation.welcome.WelcomeScreen
 /**
  * Single-Activity navigation graph.
  *
- * Launch flow: Splash (branded name, ~3.6s, fades out) -> Welcome (landing page) -> Recipes.
+ * Launch flow: Splash (floating-heart animation, ~1.9s, cross-fades out) -> Welcome -> Recipes.
  * Splash and Welcome are each popped from the back stack once left, so Recipes is the effective
  * home and its back-stack entry (ViewModel + list state) survives Recipes -> Details -> Back.
  */

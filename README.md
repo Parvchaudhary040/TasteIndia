@@ -39,7 +39,7 @@ domain/
   model/       Meal, MealDetail, Ingredient, SortOrder, AppError, DataResult
   repository/   MealRepository, FavouritesRepository (interfaces)
 presentation/
-  splash/      SplashScreen (branded launch, ~3s, fades out)
+  splash/      SplashScreen (floating-heart Canvas animation, ~1.9s, cross-fades out)
   welcome/     WelcomeScreen (one-screen landing page)
   recipes/     RecipesViewModel + immutable RecipesUiState, screen, filter sheet, chips,
                pure applyFilters()
@@ -72,11 +72,18 @@ file. Trade‑off: no compile‑time graph validation, manual wiring — fine at
 
 **Navigation.** Single‑Activity, type‑safe `@Serializable` routes.
 
-Launch flow: **Splash** (the "TasteIndia" wordmark, held ~3s then faded out — picks up
-seamlessly from the Android 12+ system splash, which is themed to the same heart + background)
-→ **Welcome** (a calm one‑screen landing page with one primary action) → **Recipes**. Splash and
-Welcome are each `popUpTo(...) { inclusive = true }`‑popped once left, so Recipes is the
-effective home and Back from it exits the app.
+Launch flow: **Splash** → **Welcome** (a calm one‑screen landing page with one primary action)
+→ **Recipes**. Splash and Welcome are each `popUpTo(...) { inclusive = true }`‑popped once left,
+so Recipes is the effective home and Back from it exits the app.
+
+The splash is a single `Canvas` driven by one `withFrameNanos` loop — no animation library. A
+large dark‑red heart eases + fades in; ~16 heart *particles* rise from the bottom (a few first,
+then more), each a pure function of `(elapsed, per‑particle spec)` for its size / speed / opacity
+/ rotation / horizontal drift, so nothing is allocated per frame and the loop stops the instant
+the composable leaves composition. It advances on *clamped* per‑frame deltas (a startup hitch on
+a slow device pauses the motion instead of skipping it) with a hard wall‑clock ceiling, and
+hands off exactly once at ~1.9s while the NavHost cross‑fades. The Android 12+ system splash is
+themed to the same heart + background so the hand‑off is seamless.
 
 `Destination.Details` carries **only `mealId: String`** — no `Meal`/`MealDetail` object is ever
 passed through navigation; the detail screen re‑resolves by id (from cache). `RecipesViewModel`
