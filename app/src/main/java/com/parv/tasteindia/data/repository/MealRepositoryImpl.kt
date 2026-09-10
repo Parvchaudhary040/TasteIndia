@@ -55,7 +55,11 @@ class MealRepositoryImpl(
 ) : MealRepository {
 
     private companion object {
-        const val INDIAN_AREA = "Indian"
+        // TheMealDB changed its data: meals that used to carry strArea="Indian" are now tagged
+        // strArea="India" (the country name), so filter.php?a=Indian returns {"meals":null} while
+        // filter.php?a=India returns the collection. The area *list* endpoint still advertises
+        // "Indian", but no meal matches it. Verified against the live API on 2026-09-10.
+        const val INDIAN_AREA = "India"
         const val MAX_CONCURRENT_DETAIL_CALLS = 4
     }
 

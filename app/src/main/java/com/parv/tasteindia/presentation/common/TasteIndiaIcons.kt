@@ -125,6 +125,23 @@ object TasteIndiaIcons {
         }
     }
 
+    val BrokenImage: ImageVector by lazy {
+        materialIcon("BrokenImage") {
+            materialPath {
+                moveTo(21f, 5f); verticalLineToRelative(6.59f); lineToRelative(-3f, -3.01f)
+                lineToRelative(-4f, 4.01f); lineToRelative(-4f, -4f); lineToRelative(-4f, 4f)
+                lineToRelative(-3f, -3.01f); verticalLineTo(5f)
+                curveToRelative(0f, -1.1f, 0.9f, -2f, 2f, -2f); horizontalLineToRelative(14f)
+                curveToRelative(1.1f, 0f, 2f, 0.9f, 2f, 2f); close()
+                moveTo(18f, 11.42f); lineToRelative(3f, 3.01f); verticalLineTo(19f)
+                curveToRelative(0f, 1.1f, -0.9f, 2f, -2f, 2f); horizontalLineTo(5f)
+                curveToRelative(-1.1f, 0f, -2f, -0.9f, -2f, -2f); verticalLineToRelative(-6.58f)
+                lineToRelative(3f, 2.99f); lineToRelative(4f, -4f); lineToRelative(4f, 4f)
+                lineToRelative(4f, -3.99f); close()
+            }
+        }
+    }
+
     val PlayCircle: ImageVector by lazy {
         materialIcon("PlayCircle") {
             materialPath {

@@ -26,8 +26,14 @@ private val LightColors = lightColorScheme(
     surfaceVariant = SpiceSurfaceVariantLight,
     onSurfaceVariant = SpiceOnSurfaceVariantLight,
     outline = SpiceOutlineLight,
+    outlineVariant = SpiceOutlineVariantLight,
     error = SpiceErrorLight,
     onError = SpiceOnErrorLight,
+    surfaceContainerLowest = SpiceSurfaceContainerLowestLight,
+    surfaceContainerLow = SpiceSurfaceContainerLowLight,
+    surfaceContainer = SpiceSurfaceContainerLight,
+    surfaceContainerHigh = SpiceSurfaceContainerHighLight,
+    surfaceContainerHighest = SpiceSurfaceContainerHighestLight,
 )
 
 private val DarkColors = darkColorScheme(
@@ -50,8 +56,14 @@ private val DarkColors = darkColorScheme(
     surfaceVariant = SpiceSurfaceVariantDark,
     onSurfaceVariant = SpiceOnSurfaceVariantDark,
     outline = SpiceOutlineDark,
+    outlineVariant = SpiceOutlineVariantDark,
     error = SpiceErrorDark,
     onError = SpiceOnErrorDark,
+    surfaceContainerLowest = SpiceSurfaceContainerLowestDark,
+    surfaceContainerLow = SpiceSurfaceContainerLowDark,
+    surfaceContainer = SpiceSurfaceContainerDark,
+    surfaceContainerHigh = SpiceSurfaceContainerHighDark,
+    surfaceContainerHighest = SpiceSurfaceContainerHighestDark,
 )
 
 /**
