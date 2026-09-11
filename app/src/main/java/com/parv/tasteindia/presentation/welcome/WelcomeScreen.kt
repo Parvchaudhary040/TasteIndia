@@ -52,7 +52,7 @@ fun WelcomeScreen(onExplore: () -> Unit) {
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = TasteIndiaIcons.Favorite,
+                    imageVector = TasteIndiaIcons.Restaurant,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(44.dp),

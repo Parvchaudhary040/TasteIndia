@@ -3,13 +3,13 @@
 
     <!--
       Launch theme only. The real UI is Compose (TasteIndiaTheme). This just makes the OS launch
-      window and the Android 12+ system splash use the app's background + a heart mark, so the
-      hand-off to the Compose splash screen is seamless. splash_background / splash_icon_tint
-      have -night variants.
+      window and the Android 12+ system splash use the app's background colour with no icon, so
+      the hand-off to the Compose splash screen (which draws the knife/spoon crossing) is
+      seamless. splash_background has a -night variant.
     -->
     <style name="Theme.TasteIndia" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/splash_background</item>
         <item name="android:windowSplashScreenBackground" tools:targetApi="s">@color/splash_background</item>
-        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="s">@drawable/splash_icon</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="s">@drawable/splash_blank</item>
     </style>
 </resources>
