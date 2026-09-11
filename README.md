@@ -4,6 +4,18 @@ A native Android app for browsing Indian recipes from [TheMealDB](https://www.th
 free v1 API. It supports search, category/ingredient filtering, sorting, a detail screen, and
 favourites that persist locally and work offline. Built as an Android intern assignment submission.
 
+## Screenshots
+
+Captured from a running debug build on a Pixel 8 emulator (API 37).
+
+| Welcome | Recipes | Filters |
+| --- | --- | --- |
+| ![Welcome screen](docs/screenshots/welcome.png) | ![Recipes list](docs/screenshots/recipes.png) | ![Filters sheet](docs/screenshots/filters.png) |
+
+| Recipe details | Favourites |
+| --- | --- |
+| ![Recipe details](docs/screenshots/details.png) | ![Favourites screen](docs/screenshots/favourites.png) |
+
 ## Features
 
 - Recipe list scoped to Indian meals only, with thumbnail, name, and a favourite toggle per row.
