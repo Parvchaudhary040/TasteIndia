@@ -48,4 +48,28 @@ class FavouritesRepositoryImplTest {
 
         assertEquals(setOf("1"), repo.observeFavouriteIds().first())
     }
+
+    @Test
+    fun `a DAO failure on insert does not throw and reports the unchanged state`() = runTest {
+        val dao = FakeFavouriteMealDao().apply { writeError = RuntimeException("disk full") }
+        val repo = FavouritesRepositoryImpl(dao, now = { clock++ })
+
+        val result = repo.toggle("1") // would have been an insert; DAO throws
+
+        assertFalse("insert failed, so this id must not be reported as favourited", result)
+        assertEquals(emptySet<String>(), repo.observeFavouriteIds().first())
+    }
+
+    @Test
+    fun `a DAO failure on delete does not throw and reports the unchanged state`() = runTest {
+        val dao = FakeFavouriteMealDao()
+        val repo = FavouritesRepositoryImpl(dao, now = { clock++ })
+        repo.toggle("1") // succeeds: now favourited
+
+        dao.writeError = RuntimeException("disk full")
+        val result = repo.toggle("1") // would have been a delete; DAO throws
+
+        assertTrue("delete failed, so this id must still be reported as favourited", result)
+        assertEquals(setOf("1"), repo.observeFavouriteIds().first())
+    }
 }

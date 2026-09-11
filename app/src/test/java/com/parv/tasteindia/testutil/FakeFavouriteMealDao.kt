@@ -11,18 +11,23 @@ class FakeFavouriteMealDao : FavouriteMealDao {
 
     private val rows = MutableStateFlow<List<FavouriteMealEntity>>(emptyList())
 
+    /** When set, every subsequent `insert`/`deleteById` call throws this instead of writing. */
+    var writeError: Throwable? = null
+
     override fun observeIds(): Flow<List<String>> =
         rows.map { list -> list.sortedByDescending { it.addedAt }.map { it.idMeal } }
 
     override suspend fun exists(id: String): Boolean = rows.value.any { it.idMeal == id }
 
     override suspend fun insert(entity: FavouriteMealEntity) {
+        writeError?.let { throw it }
         if (rows.value.none { it.idMeal == entity.idMeal }) {
             rows.value = rows.value + entity
         }
     }
 
     override suspend fun deleteById(id: String) {
+        writeError?.let { throw it }
         rows.value = rows.value.filterNot { it.idMeal == id }
     }
 }
