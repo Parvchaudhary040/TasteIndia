@@ -1,417 +1,513 @@
 # TasteIndia
 
-A native Android app that browses Indian recipes from [TheMealDB](https://www.themealdb.com/api.php)
-(free v1 API), with search, filtering, sorting, a recipe detail screen, and locally‑persisted
-favourites that work offline.
+A native Android app for browsing Indian recipes from [TheMealDB](https://www.themealdb.com/api.php)'s
+free v1 API. It supports search, category/ingredient filtering, sorting, a detail screen, and
+favourites that persist locally and work offline. Built as an Android intern assignment submission.
 
-Kotlin · Jetpack Compose · Material 3 · Navigation Compose · Coroutines/StateFlow ·
-Retrofit + OkHttp · kotlinx.serialization · Room · Coil · manual DI.
+## Features
 
----
+- Recipe list scoped to Indian meals only, with thumbnail, name, and a favourite toggle per row.
+- Search by name (local, debounced, always reflects the latest query).
+- Filter by category and by main ingredient, from a curated list of real TheMealDB values.
+- Favourites-only filter, combinable with search/category/ingredient.
+- Sort A–Z / Z–A.
+- Active-filter chips (each individually removable) plus "Clear all", and a live result count.
+- Recipe detail screen: photo, category/area chips, tags, ingredients with measures, instructions,
+  and links to the YouTube video / source recipe when TheMealDB provides them.
+- Favourite a meal from the list or from the detail screen; a separate Favourites destination
+  lists everything saved and works with no network for anything already seen.
+- State restoration: search text, category, ingredient, favourites-only, sort, and list scroll
+  position all survive Recipes → Details → Back, and search/filter/sort also survive process
+  recreation.
+- Deliberate loading / empty / error / offline states with retry, everywhere a request can fail.
+- Branded splash screen (a custom Canvas animation) and a one-screen welcome page before the
+  recipe list.
+- Light and dark theme (follows the system setting).
 
-## Build & run
+## Tech Stack
 
-Requirements: JDK is provisioned by Gradle (toolchain Java 25); Android SDK with **platform 37**
-and **build‑tools 36**; an emulator or device on **API 24+**.
+| Component | Version |
+| --- | --- |
+| Kotlin | 2.3.20 |
+| Android Gradle Plugin (AGP) | 9.4.0 |
+| Gradle | 9.6.0 |
+| KSP | 2.3.12 |
+| compileSdk | 37 |
+| minSdk | 24 |
+| targetSdk | 37 |
+| Jetpack Compose (BOM) | 2026.02.01 |
+| Material 3 | via Compose BOM |
+| Navigation Compose | 2.10.1 |
+| Lifecycle (ViewModel / runtime-compose) | 2.11.0 |
+| Retrofit | 3.0.0 |
+| OkHttp | 5.5.0 |
+| kotlinx.serialization | 1.11.0 |
+| kotlinx.coroutines | 1.10.2 |
+| Room | 2.8.5 |
+| Coil (image loading) | 3.6.2 |
+| JUnit4 | 4.13.2 |
+| kotlinx-coroutines-test | 1.10.2 |
+| OkHttp MockWebServer | 5.5.0 |
+| androidx.test.ext:junit | 1.1.5 |
+| Espresso core | 3.5.1 |
+
+All versions above are read directly from `gradle/libs.versions.toml` and
+`gradle/wrapper/gradle-wrapper.properties`. Kotlin is pinned via a `buildscript` classpath entry
+in the root `build.gradle.kts` because AGP 9's built-in Kotlin defaults to an older compiler than
+the Compose BOM / Coil in this project require; see `AI_DISCLOSURE.md` for the full reasoning.
+
+## Requirements
+
+- JDK capable of running Gradle 9.6 and compiling against Java 17 source/target compatibility
+  (Android Studio's bundled JDK satisfies this; the project's `settings.gradle.kts` includes the
+  `foojay-resolver-convention` plugin so Gradle can provision a toolchain JDK automatically if
+  needed).
+- Android SDK with **platform 37** and matching build tools installed (Android Studio's SDK
+  Manager handles this).
+- An Android emulator or physical device on **API 24 or newer** to run the app.
+- Internet access on the device/emulator to reach TheMealDB — **no API key or secret is
+  required**, TheMealDB v1 is a free public API.
+- No `local.properties` secrets, no `.env` file, nothing to configure before building.
+
+## Setup
+
+1. Clone or copy the project folder to your machine.
+2. Open the project root (the folder containing `settings.gradle.kts`) in Android Studio.
+3. Let Android Studio sync Gradle (or run `./gradlew --version` once from a terminal to trigger
+   the same sync headlessly).
+4. Start an emulator (API 24+) from the Device Manager, or connect a physical device with USB
+   debugging enabled.
+5. Run the app from Android Studio (Run ▶), or from a terminal:
+   ```bash
+   ./gradlew installDebug
+   ```
+
+To run the tests:
 
 ```bash
-./gradlew assembleDebug          # build the APK
-./gradlew testDebugUnitTest      # 54 JVM unit tests
-./gradlew connectedDebugAndroidTest   # 7 Room instrumented tests (needs a device)
-./gradlew lintDebug              # 0 errors, 9 "newer version available" warnings (see Known issues)
-./gradlew installDebug           # install on the running device
+./gradlew testDebugUnitTest          # JVM unit tests, no device needed
+./gradlew connectedDebugAndroidTest  # Room instrumented tests, needs a running device/emulator
 ```
-
-Everything is Gradle‑standard; open the folder in Android Studio and Run.
-
----
 
 ## Architecture
 
-Proportional layered architecture, one Gradle module:
+Single Gradle module (`:app`), layered by responsibility:
 
 ```
-data/
-  remote/      MealApi (Retrofit), DTOs, NetworkModule, ConnectivityInterceptor, error mapping
-  local/       Room: TasteIndiaDatabase, FavouriteMealEntity/Dao, CachedMealDetailEntity/Dao
-  repository/  MealRepositoryImpl, FavouritesRepositoryImpl, DTO→domain mappers
-domain/
-  model/       Meal, MealDetail, Ingredient, SortOrder, AppError, DataResult
-  repository/   MealRepository, FavouritesRepository (interfaces)
-presentation/
-  splash/      SplashScreen (floating-heart Canvas animation, ~1.9s, cross-fades out)
-  welcome/     WelcomeScreen (one-screen landing page)
-  recipes/     RecipesViewModel + immutable RecipesUiState, screen, filter sheet, chips,
-               pure applyFilters()
-  details/     DetailsViewModel + DetailsUiState, screen
-  favourites/  FavouritesViewModel + FavouritesUiState, screen
-  common/      MealImage (Coil), state views, URL launcher, TasteIndiaIcons
-navigation/    Destination (type‑safe routes), TasteIndiaNavHost
-di/            AppContainer, TasteIndiaApp
-ui/theme/      Material 3 "spice" palette, light + dark
+UI (Compose)  →  ViewModel  →  Repository  →  Remote (Retrofit/OkHttp) / Local (Room)
 ```
 
-**Separation of models.** Wire DTOs (`MealDetailDto` with 40 flat `strIngredient/Measure`
-fields) never leave `data/`. The repository maps them to domain models (`Meal`, `MealDetail`,
-`Ingredient`). Persistence models (`FavouriteMealEntity`, `CachedMealDetailEntity`) are separate
-again. The presentation layer has its own `RecipeListItem` / `RecipesUiState` etc.
+- **`data/remote`** — `MealApi` (Retrofit interface), request/response DTOs (`MealSummaryDto`,
+  `MealDetailDto`, ...), `NetworkModule` (OkHttp/Retrofit construction), `ConnectivityInterceptor`,
+  and `Throwable.toAppError()` (the one place every network exception is mapped to a typed error).
+- **`data/local`** — Room: `TasteIndiaDatabase`, `FavouriteMealEntity`/`FavouriteMealDao`,
+  `CachedMealDetailEntity`/`CachedMealDetailDao`.
+- **`data/repository`** — `MealRepositoryImpl`, `FavouritesRepositoryImpl`, and the DTO → domain
+  mapping functions (`MealMappers.kt`). This is the only layer that talks to Retrofit or Room
+  directly.
+- **`domain/model`** — plain Kotlin data classes with no Android/network/DB dependency: `Meal`,
+  `MealDetail`, `Ingredient`, `SortOrder`, `AppError` (a sealed error type), `DataResult<T>` (a
+  typed success/failure wrapper used instead of throwing across layers).
+- **`domain/repository`** — `MealRepository` / `FavouritesRepository` interfaces. ViewModels
+  depend on these interfaces, not the `data` implementations.
+- **`presentation/{recipes,details,favourites,splash,welcome,common}`** — one `ViewModel` +
+  one immutable `@Immutable data class ...UiState` per screen, plus the Compose screens
+  themselves. `RecipesViewModel` additionally owns a pure, unit-tested `applyFilters()` function
+  that turns `(base list, filters, favourite ids, resolved category/ingredient ids)` into the
+  final sorted list — no filtering logic lives in the Composable.
+- **`navigation`** — `Destination` (a `sealed interface` of `@Serializable` type-safe routes) and
+  `TasteIndiaNavHost`.
+- **`di`** — `AppContainer` (hand-written dependency container) and `TasteIndiaApp`.
 
-**State.** ViewModels expose a single immutable `StateFlow<...UiState>` (`data class`, `@Immutable`)
-built by `combine(...).stateIn(viewModelScope, WhileSubscribed(5s), initial)`. Compose collects
-with `collectAsStateWithLifecycle()`. ViewModels hold no Activity / NavController / Context;
-dependencies arrive through `viewModelFactory { initializer { ... } }` reading `AppContainer`
-via `APPLICATION_KEY`. There is one small Activity (`MainActivity` just hosts the `NavHost`) and
-three focused ViewModels — no god objects.
+**Why DTOs are separate from domain models:** TheMealDB's detail response is a flat 40-field shape
+(`strIngredient1..20` / `strMeasure1..20` plus assorted `str*` fields, several blank rather than
+absent). Nothing outside `data/repository` ever sees a DTO — the repository maps each one to a
+domain `Meal`/`MealDetail` with clean, nullable fields and a normalized `List<Ingredient>`.
 
-**Dependency injection.** Hand‑written `AppContainer` (interface + `DefaultAppContainer`) owned
-by `TasteIndiaApp`. `by lazy` singletons: `OkHttpClient`, `Retrofit`, `MealApi`, Room DB, DAOs,
-the two repositories, the shared `Json`. No Hilt/Koin — the assignment asks for a *lightweight*
-approach; this is ~60 lines, no annotation processing, and the whole graph is readable in one
-file. Trade‑off: no compile‑time graph validation, manual wiring — fine at this size.
-*Alternative considered:* Hilt — rejected as heavier than the problem and another KSP processor.
+**Repository responsibility:** own every read against TheMealDB and Room, cache what's worth
+caching, and — critically — be the single place that enforces the Indian boundary (see the
+dedicated section below). A repository method never returns raw, un-intersected ids.
 
-**Navigation.** Single‑Activity, type‑safe `@Serializable` routes.
+**ViewModel responsibility:** hold no `Context`/`Activity`/`NavController`; combine repository
+flows and one-shot results into a single `StateFlow<UiState>` via
+`combine(...).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initialState)`;
+expose intent functions (`onSearchQueryChange`, `toggleFavourite`, `retry`, ...) that mutate
+`SavedStateHandle` or call the repository. Compose collects state with
+`collectAsStateWithLifecycle()`.
 
-Launch flow: **Splash** → **Welcome** (a calm one‑screen landing page with one primary action)
-→ **Recipes**. Splash and Welcome are each `popUpTo(...) { inclusive = true }`‑popped once left,
-so Recipes is the effective home and Back from it exits the app.
+**Room** is used for two tables: `favourite_meals` (the actual favourites feature) and
+`cached_meal_details` (an offline/performance cache of previously fetched recipe details, storing
+the raw serialized DTO JSON rather than exploded columns).
 
-The splash is a single `Canvas` driven by one `withFrameNanos` loop — no animation library. A
-large dark‑red heart eases + fades in; ~16 heart *particles* rise from the bottom (a few first,
-then more), each a pure function of `(elapsed, per‑particle spec)` for its size / speed / opacity
-/ rotation / horizontal drift, so nothing is allocated per frame and the loop stops the instant
-the composable leaves composition. It advances on *clamped* per‑frame deltas (a startup hitch on
-a slow device pauses the motion instead of skipping it) with a hard wall‑clock ceiling, and
-hands off exactly once at ~1.9s while the NavHost cross‑fades. The Android 12+ system splash is
-themed to the same heart + background so the hand‑off is seamless.
+**Dependency injection** is a small hand-written container (`AppContainer` interface +
+`DefaultAppContainer`), not Hilt/Koin. Everything is a `by lazy` singleton (`OkHttpClient`,
+`Retrofit`, `MealApi`, the Room database and DAOs, the two repositories, the shared `Json`
+instance) built in one file and handed to ViewModels through `viewModelFactory { initializer {} }`
+reading the container off the `Application`. This avoids an annotation-processing dependency for
+a project of this size, at the cost of no compile-time graph validation.
+
+## Route Map
+
+```
+Splash
+  ↓ (auto, ~2s animation)
+Welcome
+  ↓ (Explore recipes)
+Recipes
+  ↓ (tap a recipe)          ↓ (favourites icon)
+Details/{mealId}          Favourites
+                             ↓ (tap a recipe)
+                           Details/{mealId}
+```
+
+Routes are type-safe `@Serializable` objects/data classes on `Destination` (`Splash`, `Welcome`,
+`Recipes`, `Favourites`, `Details(mealId: String)`). Splash and Welcome are each popped from the
+back stack once left (`popUpTo(...) { inclusive = true }`), so Recipes is the effective home and
+back from it exits the app.
 
 `Destination.Details` carries **only `mealId: String`** — no `Meal`/`MealDetail` object is ever
-passed through navigation; the detail screen re‑resolves by id (from cache). `RecipesViewModel`
-is scoped to its `NavBackStackEntry`, so Recipes → Details → Back returns to the *same* instance
-with filters intact.
+passed through navigation. Both entry points (Recipes and Favourites) navigate to the same
+`Details/{mealId}` route, and `DetailsViewModel` re-resolves the full recipe by id through
+`MealRepository.getMealDetail`, which is served from an in-memory cache, then a Room cache, before
+any network call. `RecipesViewModel` is scoped to its own `NavBackStackEntry`, so returning from
+Details lands on the same ViewModel instance with its filter state intact.
 
----
+## API Endpoints
 
-## API / endpoints
-
-Only TheMealDB **v1 public** API (`https://www.themealdb.com/api/json/v1/1/`). No private,
-scraped, paid or alternative APIs.
+Only TheMealDB's free **v1 public** API is used, base URL
+`https://www.themealdb.com/api/json/v1/1/`. No key, no private/paid/alternative API.
 
 | Endpoint | Used for |
 | --- | --- |
-| `filter.php?a=India` | the **Indian base set** (id, name, thumbnail only) |
-| `filter.php?c={category}` | meals in a category (all cuisines — intersected, see below) |
-| `filter.php?i={ingredient}` | meals by main ingredient (all cuisines — intersected) |
-| `lookup.php?i={mealId}` | full detail for one meal |
+| `filter.php?a=India` | **The authoritative Indian base collection** — every meal id the app will ever show comes from this response. |
+| `filter.php?c={category}` | Meals in a category, across all cuisines. |
+| `filter.php?i={ingredient}` | Meals by main ingredient, across all cuisines. |
+| `lookup.php?i={mealId}` | Full detail for one meal, by id. |
 
-`search.php?s=` is **not** used — see *Search strategy*. `Retrofit` `@Query` handles URL
-encoding, so category/ingredient values are passed raw.
+`search.php` is not used (see *Indian Boundary and Filtering*, "Search is local"). `list.php` is
+not used (see *Data Normalization / filter options* below).
 
-> **Deviation from the brief:** the assignment specifies `filter.php?a=Indian`. Between the brief
-> being written and this build, TheMealDB re‑tagged its Indian meals with `strArea="India"` (the
-> country name). `a=Indian` now returns `{"meals":null}`; `a=India` returns the ~15 Indian meals.
-> `MealRepositoryImpl.INDIAN_AREA` is `"India"` with a comment. Verified against the live API on
-> 2026‑09‑10. This is a data change upstream, not a change of endpoint.
+The category and ingredient endpoints return meals from **every** area TheMealDB has, not just
+India — they do not define an Indian collection on their own. Their results are only ever used
+after being intersected with the `filter.php?a=India` response; see the next section.
 
-**Empty is not an error.** Every endpoint returns HTTP 200 `{"meals":null}` when nothing matches.
-That maps to `DataResult.Success(emptyList())`, never an `AppError` — the classic bug with this
-API. The one exception: `lookup.php` returning no meal for a requested id → `AppError.NotFound`,
-because a detail screen has nothing to render.
+**Deviation from the literal assignment text:** the brief specifies `filter.php?a=Indian`. As of
+this build, TheMealDB tags Indian meals with `strArea="India"` (the country name) instead;
+`a=Indian` returns `{"meals":null}` while `a=India` returns the ~15 Indian meals. This was
+verified against the live API during development and is a data change on TheMealDB's side, not a
+different endpoint or a misreading of the brief.
 
----
+**Empty is not an error.** TheMealDB returns HTTP 200 with `{"meals":null}` when nothing matches a
+filter/category/ingredient query — that maps to a successful empty list, never `AppError`. The one
+exception is `lookup.php` returning no meal for a requested id, which maps to `AppError.NotFound`
+because a details screen has nothing to render.
 
-## Indian‑boundary / filtering strategy
+## Indian Boundary and Filtering
 
-**The Indian base set is authoritative.** `filter.php?a=India` is loaded once and held in memory
-(`MealRepositoryImpl`, behind a `Mutex` with double‑checked caching). It is the universe of meal
-IDs the app will ever show.
-
-`filter.php?c=` and `filter.php?i=` return meals from **every** cuisine. The repository never
-hands those back raw:
+The Indian base set (`filter.php?a=India`) is loaded once and held in memory. It is the only
+source of truth for "is this meal in TasteIndia":
 
 ```
-getIndianMealIdsForCategory(cat):
-    ids = filter.php?c=cat  →  retainAll( indianBaseIds )   →  Set<String>
+Indian base IDs
+      ∩
+category IDs (from filter.php?c=...)
+      ∩
+ingredient IDs (from filter.php?i=...)
+      =
+valid result IDs
 ```
 
-There is **no method on `MealRepository` that returns un‑intersected IDs**, so no ViewModel or
-screen can escape the Indian boundary — it is enforced in one place, in the data layer.
+`MealRepository.getIndianMealIdsForCategory(category)` and `getIndianMealIdsForIngredient(...)`
+each call the matching `filter.php` endpoint and intersect the returned ids with the Indian base
+id set before returning — there is no method on `MealRepository` that hands back an un-intersected
+id set, so no ViewModel or screen can bypass the boundary.
 
-The presentation layer applies filters with a **pure function** (`applyFilters`, unit‑tested):
-starting from the in‑memory Indian base list, it keeps only meals whose id is in the resolved
-category set / ingredient set / favourites set, then substring‑matches the search query, then
-sorts. Because the starting list *is* the Indian base set, filtering by the resolved id sets is a
-**second** intersection with the boundary.
+On top of that, `RecipesViewModel`'s pure `applyFilters()` starts from the in-memory Indian base
+list itself (not from an arbitrary meal list) and filters *that* down by the resolved
+category/ingredient id sets, favourites, and search text. Because the starting list already is the
+Indian base set, filtering by those resolved ids is a second intersection with the same boundary.
 
-**Latest state wins.** Category/ingredient selections resolve through `flatMapLatest`, so a slow
-earlier request is cancelled and never "arrives late". The search query is `debounce(200ms)` +
-`distinctUntilChanged` before it reaches the filter `combine`.
+**Favourites are checked against the same boundary, not re-derived from a lookup.** Favourite ids
+are persisted in Room as bare strings, independent of any single request. When the Favourites
+screen resolves them into rows, each id is looked up in the current in-memory Indian base set
+first. An id that isn't currently in the base set (offline before the base set has loaded, or an
+id TheMealDB has since reclassified out of the area) is resolved from this app's own previously
+cached detail (`MealRepository.getCachedMealDetail`, memory + Room only) if available, and left as
+"unresolved" otherwise. **A successful `lookup.php` response is deliberately never treated as
+proof that a meal is Indian** — `getMealDetail` (the method that does make a live `lookup.php`
+call) has no area check, so using its success as a validity signal would let a foreign or
+reclassified id back into the app. Only the base-set intersection, or this app's own prior cache,
+establishes membership.
 
-**Search strategy.** Search is **local** over the ~15‑item in‑memory base set — instant, and it
-cannot return stale results. `search.php` is deliberately unused: it would return all cuisines
-(needing yet another intersection) and reintroduce the stale‑response problem the brief warns
-about. Trade‑off: the app can't find an Indian meal that is absent from `filter.php?a=India`;
-accepted, and it matches the brief's "prefer local filtering of the loaded Indian base set".
+**Latest state wins.** Category/ingredient selections resolve through `flatMapLatest`, so a slower
+earlier request is cancelled and its result can never overwrite a faster later selection. The
+search query is `debounce(200ms)` + `distinctUntilChanged()` before it reaches the filter
+`combine`.
 
-**Filter options.** `FilterOptions` ships short, curated lists of real TheMealDB category /
-ingredient values (`Chicken`, `Garam Masala`, …). `list.php?c=list` / `list.php?i=list` are
-outside the allowed endpoint set, and the base‑set response carries no category/ingredient data
-to derive options from without enriching every row. An option that matches no Indian meal simply
-yields the empty state.
+## Search, Sort and State
 
----
+- **Search** is local, over the in-memory Indian base list (a case-insensitive substring match on
+  the trimmed query), after a 200ms debounce so rapid typing doesn't re-filter on every keystroke.
+  `search.php` is intentionally not used — it returns all cuisines and would need its own
+  intersection, and local search over a small (~15-meal) base set is instant and never stale.
+- **Category** and **ingredient** filters use a curated fixed list of real TheMealDB values
+  (`FilterOptions.CATEGORIES` / `FilterOptions.INGREDIENTS`) shown in a filter bottom sheet; each
+  selection resolves through the Indian-boundary intersection described above.
+- **Favourites-only** filters the visible list down to ids in the current favourite set.
+- **Sort** is A–Z / Z–A over the (already filtered) result, case-insensitive.
+- **Result count** and active-filter chips (each individually removable, plus "Clear all") are
+  derived from the same `RecipesFilters`/`RecipesUiState` the list is built from, so they can never
+  disagree with what's on screen.
 
-## Cache & performance strategy
+**Source of truth.** Search text, category, ingredient, favourites-only, and sort all live in
+`RecipesViewModel`'s `SavedStateHandle` (five keys, e.g. `recipes.query`, `recipes.category`).
+They're exposed as `StateFlow`s via `handle.getStateFlow(...)` and combined into the filter
+pipeline; intent functions (`onSearchQueryChange`, `onCategorySelected`, ...) write straight back
+into the handle.
+
+**State restoration.** Because these five values live in `SavedStateHandle`, they survive both a
+Recipes → Details → Back navigation (the ViewModel is scoped to the Recipes back-stack entry and
+is never recreated for that round trip) and process death / recreation (`SavedStateHandle` is
+backed by the saved-instance-state mechanism). The recipe list's scroll position uses
+`rememberLazyListState()`, which is itself `rememberSaveable`-backed and preserved by
+`NavHost`'s per-back-stack-entry saved state, so scrolling down, opening a recipe, and pressing
+Back returns to the same scroll offset.
+
+## Caching and Network Strategy
 
 | Cache | Where | Purpose |
 | --- | --- | --- |
-| Indian base set | in‑memory (`@Volatile` + `Mutex`) | loaded once; `forceRefresh` on retry |
-| Category / ingredient id sets | in‑memory `ConcurrentHashMap` keyed by value | re‑selecting a filter or re‑selecting after *Clear all* does zero network |
-| Meal detail (memory) | `ConcurrentHashMap<id, MealDetail>` | returning to a recipe is instant |
-| Meal detail (disk) | Room `cached_meal_details` (raw DTO JSON blob) | survives process death; enables offline detail |
-| Images | Coil, reusing the app's single `OkHttpClient` | one connection pool + timeout policy |
+| Indian base set | in-memory (`@Volatile` field behind a `Mutex`, double-checked) | loaded once per process; `forceRefresh` re-fetches on retry |
+| Category/ingredient id sets | in-memory `ConcurrentHashMap` keyed by the filter value | re-selecting a filter, or re-selecting after Clear all, does zero network work |
+| Meal detail (memory) | `ConcurrentHashMap<id, MealDetail>` | returning to a previously opened recipe is instant |
+| Meal detail (disk) | Room `cached_meal_details` table | survives process death; enables offline detail viewing for previously seen meals |
 
-**N+1 protection.** The recipe list shows image + name + favourite only, so it makes **no
-per‑row detail calls** — there is no N+1 to begin with. On top of that, `getMealDetail(id)` is:
-memory → Room → network; concurrent callers for the same id **share one `Deferred`**
-(`computeIfAbsent`, cleared on completion so a later refetch isn't blocked); total detail
-concurrency is bounded by `Semaphore(4)`. No network work is launched from a `LazyColumn` item.
+**Detail request handling (`getMealDetail`)** checks the memory cache, then the Room cache, before
+ever calling the network. Concurrent calls for the same id share one in-flight request
+(`ConcurrentHashMap.computeIfAbsent` around a `Deferred`, cleared on completion), and total
+concurrent detail requests are bounded by a `Semaphore(4)`. The recipe list itself never triggers
+per-row detail calls (a row only needs image, name, and favourite state), so there is no N+1
+pattern to begin with; the bounding above covers detail requests triggered from elsewhere (e.g.
+resolving several favourites at once).
 
-The detail cache stores the raw DTO JSON rather than exploded columns because it is only ever
-read by id, and this avoids ~20 Room `TypeConverter` pairs; a corrupt/stale row is swallowed and
-refetched.
+**Cancellation.** Every ViewModel does its work inside `viewModelScope`; `Throwable.toAppError()`
+explicitly rethrows `CancellationException` rather than mapping it to an error, so cancelling an
+in-flight request (e.g. a superseded category selection via `flatMapLatest`) doesn't surface as a
+user-visible failure.
 
----
+**Timeouts.** OkHttp is configured with a 10s connect timeout, 15s read timeout, and 20s overall
+call timeout, each mapped to `AppError.Timeout`.
 
-## Reliability — deliberate states
+**HTTP errors.** A non-2xx response throws Retrofit's `HttpException`, mapped to
+`AppError.Http(code)` and shown as a plain-language message including the status code.
 
-`AppError` is a sealed type: `Network`, `Timeout`, `Http(code)`, `NotFound`, `Serialization`,
-`Unknown`. `Throwable.toAppError()` maps every exception the stack can throw in one tested place;
-`CancellationException` is rethrown, never swallowed.
+**Offline behavior.** `ConnectivityInterceptor` checks `ConnectivityManager` before a request
+leaves the app and fails fast with `AppError.Network` if there's no active network, so the user
+sees the offline state immediately rather than waiting out a connect timeout. This is a fast-path
+optimization only — the interceptor's guess is never treated as authoritative on its own; if it
+misjudges connectivity, the real OkHttp call still runs and any resulting `IOException`/timeout is
+mapped the same way. This app does not claim to work fully offline: only previously fetched data
+(the Indian base list, cached recipe details, and Room-stored favourite ids) is available without
+a network connection.
+
+**Retry.** Every error state (Recipes list, filter resolution, Details, Favourites) presents a
+"Try again" action that re-runs the failed operation.
+
+## Favourites
+
+- Favourites are a single Room table (`favourite_meals`), storing only `idMeal` and `addedAt` —
+  no meal content is duplicated into the favourites table.
+- `FavouritesRepository.toggle(id)` adds or removes a row and reports the resulting state;
+  `observeFavouriteIds()` is a `Flow<Set<String>>` that both the Recipes screen (for the heart
+  icon state / favourites-only filter) and the Favourites screen collect.
+- Favourites work with no network: reading, adding, and removing rows is Room-only.
+- Favourites persist across app relaunch (Room writes to disk; verified with an instrumented test
+  that closes and reopens the database file).
+- Favourite ids are validated against the Indian boundary when displayed (see *Indian Boundary and
+  Filtering*): the Favourites screen resolves each saved id against the current Indian base set,
+  falling back only to this app's own cached detail, never to a fresh unrestricted lookup.
+- A Room write failure (e.g. a disk error) is caught in `FavouritesRepositoryImpl.toggle()` and
+  reported as the pre-toggle state instead of throwing, so a local-storage hiccup can't crash a
+  screen; `CancellationException` is still rethrown so cancellation keeps working correctly.
+
+## Data Normalization
+
+`MealMappers.kt` is the only place DTOs are converted to domain models.
+
+- **Ingredients:** TheMealDB's detail response has 20 positional `strIngredient1..20` /
+  `strMeasure1..20` fields, each independently possibly `null`, empty, or whitespace.
+  `normalizeIngredients` treats a pair as meaningful only if the ingredient name is non-blank after
+  trimming; the measure is trimmed and kept (or becomes `""` if absent); a slot with a measure but
+  no name is dropped as noise. The result is a clean `List<Ingredient>` with no empty slots.
+- **Tags:** `strTags` is a comma-separated string; `splitTags` trims each piece, drops blanks,
+  de-duplicates, and preserves order.
+- **Blank → null:** every other optional string field (category, area, instructions, thumbnail,
+  YouTube URL, source URL) is trimmed and normalized to `null` when empty, so the UI only has to
+  check for `null` / empty list, never for blank strings.
+- **Instructions:** CRLF line endings are normalized to LF so Compose renders paragraphs correctly.
+
+## Error and Empty States
 
 | State | Behaviour |
 | --- | --- |
-| **Loading** | spinner + "Loading recipes…", `liveRegion` announced |
-| **Success** | list; `"N recipes"` / `"… match your filters"` count |
-| **Empty / no results** | context‑aware message (no favourites yet / no match / nothing loaded) |
-| **API error** | `Http(code)` → "The recipe service is having trouble (error 503)…" |
-| **Timeout** | OkHttp connect 10s / read 15s / call 20s → `AppError.Timeout` → "took too long" |
-| **Offline** | `ConnectivityInterceptor` checks `ConnectivityManager` **before** the request and throws — the offline state appears immediately, not after a connect timeout |
-| **Retry** | every error state (Recipes, Details, filter resolution, Favourites) has *Try again* |
-| **Partial data** | list rows with a blank id/name are dropped; the detail screen renders only non‑empty fields; a "name‑only" meal doesn't crash |
-| **Image failure** | `MealImage` (Coil `SubcomposeAsyncImage`) has explicit loading and error slots that both fill the caller's fixed box — the row never collapses; a null/blank URL routes straight to the error slot |
+| Loading | Spinner with a "Loading recipes…" label, announced via `liveRegion`. |
+| No results | Context-aware empty message (no favourites yet / nothing matches this filter combination / nothing loaded), with "Clear all" where relevant. |
+| API/provider error | A non-2xx response shows a plain-language message including the HTTP status code, with a "Try again" button. |
+| Timeout | A configured OkHttp timeout maps to a "took too long, try again" message. |
+| Offline | Detected before the request is sent; shown as an immediate offline message with retry, not a long spinner. |
+| Retry | Present on every error state (Recipes, filter resolution, Details, Favourites). |
+| Partial/malformed detail data | List rows with a blank id/name are dropped from the base set; on the details screen, only non-empty fields render, so a sparsely-populated recipe still displays cleanly. |
+| Image failure | `MealImage` (Coil `SubcomposeAsyncImage`) has explicit loading and error slots, both sized to fill the same box as a successful image, so a failed or missing thumbnail doesn't collapse the row layout. A `null`/blank URL routes straight to the error slot. |
 
-The user is never left on an infinite spinner: every load resolves to success, empty, or an
-error state with a retry.
+No load path is left on an indefinite spinner: every request resolves to success, empty, or an
+explicit error state with retry.
 
-Network: explicit HTTP status handling (Retrofit `HttpException`), configured timeouts,
-structured‑concurrency cancellation, safe URL construction (`@Query`), no requests inside
-composable bodies (all in ViewModel coroutines).
+## Accessibility
 
----
+- Icon-only controls (favourite toggle, back button, clear-search, filter chips' remove action,
+  external link buttons) carry explicit `contentDescription`/`clearAndSetSemantics` labels
+  describing the action and, where relevant, the meal name (e.g. "Add Butter Chicken to
+  favourites").
+- Result counts and the "N saved recipes" header use `liveRegion` so screen readers announce
+  changes without the user needing to navigate to them.
+- The favourite toggle is a separately focusable `IconButton` inside a card whose own tap target
+  is marked `Role.Button`, so both the row and the toggle are individually reachable by a screen
+  reader; icon buttons use Material 3's default touch target sizing.
+- Ingredient rows use `clearAndSetSemantics` to merge the name and measure into one spoken node
+  (e.g. "2 large, sliced Onion") instead of two separate announcements.
+- Purely decorative icons/images (e.g. the thumbnail next to a name that's already read aloud)
+  have `contentDescription = null` so they aren't announced twice.
+- Text uses `MaterialTheme.typography`, which scales with the system font size setting; no text is
+  rendered as a fixed-size bitmap or baked into an image.
+- Both light and dark theme are implemented (`isSystemInDarkTheme()`); Material You dynamic colour
+  is intentionally off so the app has one consistent visual identity for review.
+- State is never communicated by colour alone: loading/error/empty each have their own message and
+  icon/illustration, not just a colour change; the favourite icon changes shape (outline vs.
+  filled), not only colour.
 
-## Data normalization
-
-- **Ingredients:** `strIngredient1..20` / `strMeasure1..20` → `List<Ingredient>`. A pair is kept
-  only when the ingredient name is non‑blank after trimming; a blank/absent measure becomes
-  `""`; a slot with a measure but no name is dropped as noise. Unicode whitespace (e.g. NBSP) is
-  trimmed.
-- **Tags:** comma‑split, trimmed, blanks dropped, de‑duplicated, order preserved.
-- **Instructions:** CRLF → LF so Compose renders paragraphs.
-- **Blank → null:** every optional string field is trimmed and turned to `null` when empty, so
-  the detail screen only checks for `null` / empty list.
-- **URLs:** validated (`http`/`https` + host) before a button is shown; opened via `ACTION_VIEW`
-  intent wrapped so a malformed/unhandleable link shows a toast, never a crash; accessibility
-  labels name the host ("… on youtube.com"), never a raw URL.
-
----
-
-## UI / UX
-
-Material 3, light + dark (`isSystemInDarkTheme()`), custom "spice" palette with the warm
-`surfaceContainer*` tonal steps defined for both themes. **Dynamic colour is intentionally off**
-so the app has one consistent identity for review; easily re‑enabled.
-
-Accessibility: 48dp touch targets (favourite buttons are separately‑focusable `Button`s with
-"Add/Remove *name* to favourites" labels); `contentDescription` on icon buttons and images;
-`liveRegion` on counts and state views; text uses `MaterialTheme.typography` (scales with system
-font size); `clearAndSetSemantics` on ingredient rows so a screen reader reads
-"2 large, sliced Onion" as one node; no raw URLs as labels.
-
-Iconography: the nine glyphs used are inline `ImageVector`s (`TasteIndiaIcons`, Material Symbols
-path data) — `material-icons-core` is frozen at 1.7.8 and no longer managed by the Compose BOM,
-so pinning it would mean a stale, mismatched artifact.
-
----
+This was not verified with an automated accessibility scanner (e.g. Accessibility Scanner /
+Compose UI test semantics assertions) — the above reflects what's implemented in the composables,
+not a tooled audit.
 
 ## Testing
 
-**61 tests, deterministic, no network** — fixtures / in‑memory fakes / MockWebServer only.
+All tests are deterministic: they use fixture JSON files, hand-written in-memory fakes, and
+OkHttp's `MockWebServer`, never the live TheMealDB API. 61 JVM unit tests currently pass
+(`./gradlew testDebugUnitTest`); 7 instrumented Room tests exist across 3 suites and require a
+connected device/emulator to run (`./gradlew connectedDebugAndroidTest`).
 
-**Unit (`testDebugUnitTest`, 54)**
+**Unit tests (`app/src/test`, `testDebugUnitTest`)**
 
-| Suite | Covers |
+| Suite | What it covers |
 | --- | --- |
-| `IngredientNormalizationTest` (7) | **required #1** — ingredient/measure normalization + tag splitting, `lookup_normal` / `lookup_missing_fields` (NBSP) / `lookup_minimal` fixtures |
-| `IndianBoundaryIntersectionTest` (7) | **required #2** — category/ingredient ∩ Indian base, no‑overlap → empty set, partial‑row drop, base fetched once |
-| `RecipeFilteringTest` (8) | pure `applyFilters` — AND‑combination, trimmed case‑insensitive search, unresolved‑filter passthrough, sort, base‑list intersection |
-| `LatestFilterStateWinsTest` (4) | **required #3** — a 1s category never overrides a faster later one (asserts it never reached the UI); only the final query in a burst applies |
-| `RecipesStateRestorationTest` (3) | **required #4 (restoration)** — `SavedStateHandle` round‑trip rebuilds search/category/favourites‑only/sort and the exact filtered list |
-| `FavouritesRepositoryImplTest` (3) | **required #4 (persistence)** — toggle add/remove, observe, idempotency |
-| `FavouritesViewModelTest` (4) | resolve against base set, empty, live un‑favourite, unresolved id |
-| `DetailsViewModelTest` (3) | load by id, favourite reflect/toggle, `NotFound` |
-| `MealDetailCacheTest` (5) | memory/Room cache, write‑through, concurrent de‑dup, `NotFound` |
-| `NetworkErrorsTest` (6) | the exception → `AppError` table |
-| `MealApiReliabilityTest` (6) | **real** OkHttp + Retrofit + kotlinx‑serialization vs MockWebServer — empty → success, 500 → `Http(500)`, malformed → `Serialization`, slow → `Timeout`, offline → `Network` (0 requests reach the wire) |
+| `IngredientNormalizationTest` | `strIngredient1..20`/`strMeasure1..20` → `Ingredient` normalization, and tag splitting. |
+| `IndianBoundaryIntersectionTest` | Category/ingredient results intersected with the Indian base set; no-overlap → empty set; partial/blank rows dropped; base set fetched from the network only once. |
+| `RecipeFilteringTest` | The pure `applyFilters` function: AND-combination of filters, case-insensitive search, sorting, base-set boundary. |
+| `LatestFilterStateWinsTest` | A slower earlier category/search selection never overrides a faster later one. |
+| `RecipesStateRestorationTest` | A pre-populated `SavedStateHandle` rebuilds search/category/favourites-only/sort and the exact filtered list. |
+| `FavouritesRepositoryImplTest` | Toggle add/remove/idempotency, `observeFavouriteIds`, and that a DAO failure on insert/delete doesn't throw and reports the unchanged state. |
+| `FavouritesViewModelTest` | Resolving favourites against the base set; an id outside the base set stays unresolved rather than resolving via a live network lookup; an id outside the base set resolves from this app's own cache with zero network calls. |
+| `DetailsViewModelTest` | Loading a meal by id, reflecting/toggling favourite state, `NotFound` handling. |
+| `MealDetailCacheTest` | Memory/Room cache hits, write-through, concurrent-request de-duplication, `getCachedMealDetail` never calling the network. |
+| `NetworkErrorsTest` | The exception → `AppError` mapping table. |
+| `MealApiReliabilityTest` | Real OkHttp + Retrofit + kotlinx.serialization against `MockWebServer`: empty response, HTTP 500, malformed JSON, slow response, offline. |
 
-**Instrumented (`connectedDebugAndroidTest`, 7)** — real Room:
+**Instrumented tests (`app/src/androidTest`, `connectedDebugAndroidTest`)** — real Room, no fakes:
 
-| Suite | Covers |
+| Suite | What it covers |
 | --- | --- |
-| `FavouriteMealDaoTest` (3) | insert/exists/delete, most‑recent‑first, IGNORE‑on‑conflict |
-| `FavouritesPersistenceTest` (2) | **required #4** — write → close DB (as process death) → reopen from file → rows (and removals) persist |
-| `CachedMealDetailDaoTest` (2) | absent → null, upsert REPLACE |
-
-Fixtures: `filter_indian`, `filter_indian_partial`, `filter_category_seafood`,
-`filter_ingredient_chicken`, `filter_empty`, `filter_malformed`, `lookup_normal`,
-`lookup_missing_fields`, `lookup_minimal`.
-
----
-
-## Final audit — requirements checklist
-
-Legend: **PASS** = implemented and tested (unit and/or on the emulator via Android MCP).
-
-### Tech stack
-| Requirement | Status | Notes |
-| --- | --- | --- |
-| Kotlin, Jetpack Compose, Material 3 | PASS | |
-| Navigation Compose | PASS | type‑safe routes |
-| Coroutines, StateFlow | PASS | |
-| Retrofit + OkHttp | PASS | Retrofit 3, OkHttp 5 |
-| kotlinx.serialization | PASS | codegen, no reflection |
-| Room for favourites | PASS | + detail cache |
-| Lightweight DI | PASS | hand‑written `AppContainer` |
-| ViewModels, Repository pattern | PASS | 3 ViewModels, 2 repositories behind interfaces |
-| Only TheMealDB v1 API | PASS | 4 endpoints, no `search.php`, no `list.php` |
-
-### Core features
-| # | Requirement | Status | Notes |
-| --- | --- | --- | --- |
-| 1 | Recipes screen: `LazyColumn`, image + name + favourite + stable `idMeal` key | PASS | no category on rows |
-| 2 | Search by name, safe vs rapid typing / stale results, local‑first | PASS | debounce + local filter over base set |
-| 3 | Filters: category, main ingredient, favourites‑only | PASS | |
-| 3 | Sort A–Z / Z–A | PASS | segmented buttons |
-| 3 | Active filters, result count, empty state, Clear all | PASS | removable chips + live count |
-| 4 | Category/ingredient intersect with Indian base IDs; boundary can't be escaped | PASS | enforced in `MealRepository`; unit‑tested |
-| 5 | Navigate by meal ID only; never pass `Meal` object | PASS | `Destination.Details(mealId)` |
-| 5 | Details show every non‑empty field (hero, name, category, area, ingredient/measure, instructions, tags, source, video) | PASS | conditional rendering |
-| 5 | Normalize `strIngredient/Measure` into clean `Ingredient`; trim; omit empty | PASS | unit‑tested incl. NBSP |
-| 6 | Favourite from list and from details | PASS | |
-| 6 | Persist favourite IDs with Room; work offline | PASS | instrumented persistence test |
-| 6 | Separate Favourites destination; opens same ID‑based Details | PASS | |
-| 7 | Recipes→Details→Back restores search / category / ingredient / favourites‑only / sort / list position | PASS | ViewModel scoped to back‑stack entry + `SavedStateHandle` + hoisted `LazyListState`; verified on emulator + unit test |
-| 8 | Deliberate states: loading, success, empty, API error, timeout, offline, retry, partial data, image failure | PASS | see *Reliability*; offline is instant |
-| 8 | Never leave the user on an infinite spinner | PASS | |
-| 9 | Explicit HTTP status handling, timeouts, cancellation, safe URL construction | PASS | |
-| 9 | No network requests inside composable bodies | PASS | all in ViewModel coroutines |
-| 10 | No uncontrolled detail requests per visible row | PASS | list makes zero detail calls |
-| 10 | Repository enrichment, caching, dedup, bounded concurrency | PASS | memory+Room cache, shared `Deferred`, `Semaphore(4)` |
-| 10 | Never launch network work from `LazyColumn` item rendering | PASS | |
-
-### Architecture
-| Requirement | Status |
-| --- | --- |
-| `data` / `domain` / `presentation` / `navigation` / `di` layout | PASS |
-| DTOs / domain / UI state / persistence models kept separate | PASS |
-| Immutable UI state; ViewModels expose immutable `StateFlow` | PASS |
-| Lifecycle‑aware collection in Compose | PASS |
-| No Activity / NavController / mutable UI in ViewModels | PASS |
-| No giant Activity; no single god ViewModel | PASS |
-
-### Testing
-| Requirement | Status |
-| --- | --- |
-| Ingredient/measure normalization test | PASS |
-| Indian + category/ingredient intersection test | PASS |
-| Latest search/filter state wins test | PASS |
-| Favourite persistence / navigation restoration test | PASS |
-| Deterministic fixtures, no public API | PASS |
-| Fixtures: normal / missing fields / ingredients / image / tags / instructions | PASS |
-
-### UI/UX
-| Requirement | Status |
-| --- | --- |
-| Light + dark theme | PASS (verified on emulator) |
-| Accessible touch targets, screen‑reader semantics, scalable text | PASS |
-| Clear loading / useful empty / useful error states | PASS |
-| Accessible favourite buttons; descriptive source/video links; no raw URLs as labels | PASS |
-| Clean hierarchy, spacing, consistent cards, polished details | PASS |
-
-### Build / quality gates run for this audit
-| Gate | Result |
-| --- | --- |
-| `./gradlew clean assembleDebug` | **SUCCESS** |
-| `./gradlew testDebugUnitTest` | **54 passed, 0 failed** |
-| `./gradlew connectedDebugAndroidTest` | **7 passed, 0 failed** |
-| `./gradlew lintDebug` | **0 errors, 9 warnings** (all "newer version available" — deliberate pins) |
-| Emulator smoke test (Pixel 8, API 37, Android MCP) | list, search, all filters, sort, details, back‑state, favourites, offline+retry, light+dark — all OK |
-
-**NEEDS REVIEW:** none.
-
----
+| `FavouriteMealDaoTest` | Insert/exists/delete, most-recent-first ordering, insert-ignore on conflict. |
+| `FavouritesPersistenceTest` | Write rows, close the database (simulating process death), reopen from the same file, confirm rows (and removals) persist. |
+| `CachedMealDetailDaoTest` | Missing id returns `null`; upsert replaces an existing row. |
 
 ## Assumptions
 
-- The Indian collection is small (~15 meals). Local search / filter is instant, so no
-  server‑side search is needed.
-- Users only favourite meals they can see, i.e. Indian meals from the list or their detail
-  screen. The Favourites screen resolves ids from the base set, then the detail cache — an id
-  that resolves to neither (offline + never viewed) is shown as an "unresolved" count.
-- `filter.php?a=India` is the correct current query for "the Indian collection" (see API note).
-- Category/ingredient filter values are a curated fixed list, since the list endpoints are out
-  of scope and the base response has no category data.
-- One Gradle module is proportional for this size; no `:core` / `:feature` split.
+- The Indian collection returned by `filter.php?a=India` is small (~15 meals), which is why local,
+  in-memory search/filtering is fast enough with no server-side search.
+- Users can only favourite meals they can actually see — a meal from the Recipes list or its
+  detail screen. The Favourites screen resolves saved ids against the base set, then this app's own
+  cache; an id that resolves to neither (offline, and never previously viewed) is shown as an
+  "unresolved" count rather than silently dropped.
+- `filter.php?a=India` (not the literal `a=Indian` from the brief) is the correct current query
+  for TheMealDB's Indian collection — see *API Endpoints*.
+- Category and ingredient filter values are a small curated list rather than fetched from
+  `list.php`, because that endpoint is outside the endpoint set this project uses and the base-set
+  response carries no category/ingredient data to derive options from.
+- A single Gradle module is proportional for a project this size; no `:core`/`:feature` split.
 
-## Trade‑offs
+## Tradeoffs
 
 | Decision | Upside | Downside |
 | --- | --- | --- |
-| Hand‑written DI | tiny, no codegen, fully readable | no compile‑time graph checks; manual wiring |
-| Local‑only search | instant, never stale, one intersection fewer | can't find Indian meals absent from `a=India` |
-| Detail cache = raw JSON blob in Room | no TypeConverters, one mapping site | not queryable by field (never needed) |
-| Curated filter option lists | no extra endpoints, no per‑row enrichment | options may not all match Indian meals |
-| `WhileSubscribed(5s)` on `stateIn` | frees upstream when screen is away | a >5s detour re‑runs `combine` on return (from cache, no network) |
-| Kotlin pinned to 2.3.20 | matches Gradle's own Kotlin, exact KSP pairing, reads the 2.4.x stdlib the libs pull | lint flags newer 2.4.x plugins as available |
-| Enrichment not done for list rows | zero N+1, matches "don't show category until available" | list rows can't show category/area (by design) |
+| Hand-written `AppContainer` instead of Hilt/Koin | Small, no annotation processing, whole graph readable in one file | No compile-time graph validation; wiring is manual |
+| Local-only search, `search.php` unused | Instant, never returns a stale result, no extra Indian-boundary intersection | Can't find an Indian meal that TheMealDB doesn't return under `a=India` |
+| Detail cache stored as a raw DTO JSON blob in Room | One mapping site, no ~20-field `TypeConverter` set | Cached details aren't queryable by individual field (not currently needed) |
+| Curated fixed filter option lists | No extra endpoint, no per-row enrichment to build the list from | Some options may match zero Indian meals and yield the empty state |
+| `getCachedMealDetail` (cache-only) fallback for favourites outside the base set | Never lets a network lookup "prove" Indian membership; still works offline for previously seen meals | An id that's outside the base set and was never cached stays unresolved rather than being fetched fresh |
+| `WhileSubscribed(5_000)` on every `stateIn` | Frees upstream work while a screen isn't collected | Returning after more than 5s idle re-runs the `combine` (served from cache, not a network call) |
+| List rows show only image/name/favourite (no per-row detail enrichment) | Zero N+1 network calls from the list | Category/area aren't visible until the detail screen |
 
-## Known issues
+## Known Issues
 
-- **`filter.php?a=Indian` is empty upstream** — worked around with `a=India` (documented above).
-- **Lint: 9 "newer version available"** — `compose-bom 2026.09.00`, Kotlin plugins 2.4.20,
-  coroutines 1.11.0, some AndroidX test libs. Left on the pinned toolchain deliberately
-  (KSP 2.3.12 pairs with Kotlin 2.3.20; a Kotlin bump forces a matched KSP bump). Not blocking.
-- **Release build:** `minifyEnabled` / R8 is off (`optimization { enable = false }` from the
-  template). The app ships as debug for review; a release pass would enable R8 with keep rules
-  for kotlinx.serialization + Room.
-- **No pull‑to‑refresh** — retry is via the error‑state button and the Filters sheet; a
-  `PullToRefreshBox` on the list would be a small, natural addition.
-- **Details screen has no dedicated `SavedStateHandle` restoration** beyond the meal id in the
-  route (it re‑loads from cache instantly, so there is nothing else to restore).
-- **`data_extraction_rules.xml` / `backup_rules.xml`** are the template defaults; Auto Backup
-  would include the favourites DB, which is the desired behaviour, but the rules haven't been
-  reviewed field‑by‑field.
+- **`filter.php?a=Indian` (the brief's literal query) returns no results upstream** — worked
+  around with `a=India`; documented in *API Endpoints* and in code comments.
+- **No pull-to-refresh** — retry is via the error-state button and reopening the filter sheet; a
+  `PullToRefreshBox` on the list would be a natural small addition.
+- **Release build is unoptimized** — `minifyEnabled`/R8 is off in the release build type
+  (inherited from the project template); the app is intended to be reviewed as a debug build. A
+  release pass would need R8 keep rules for kotlinx.serialization and Room.
+- **No automated accessibility scan** — accessibility semantics were implemented and reasoned
+  about (see *Accessibility*) but not verified with an automated scanner or Compose accessibility
+  test.
+- **Instrumented Room tests need a connected device/emulator** and were not re-run as part of this
+  README update (no device was attached in this environment); they were last verified passing on
+  an API 37 emulator during development and touch code that hasn't changed since.
 
-## Time spent
+There are no known assignment-blocking issues.
 
-Roughly **9–11 hours** equivalent effort: ~1h inspection & planning, ~1h dependency/toolchain
-resolution (AGP 9 built‑in Kotlin vs the libraries' stdlib), ~1.5h data layer + error handling,
-~1.5h recipe list + image loading, ~2h search/filters/sort + Indian‑boundary logic, ~1h details
-+ ID navigation, ~1h favourites, ~1h reliability hardening, ~1.5h tests, ~1h audit + docs.
-Delivered as 10 incremental commits.
+## Attribution
 
-## AI / tool‑use disclosure
+- Recipe data, images, and metadata are served by [TheMealDB](https://www.themealdb.com/) v1
+  public API (`https://www.themealdb.com/api/json/v1/1/`), used under its free-tier terms. This
+  project is not affiliated with, endorsed by, or sponsored by TheMealDB; recipe content and
+  photos returned by the API belong to TheMealDB and its contributors.
+- Open-source libraries used (see *Tech Stack* for versions), each under its own upstream license:
+  Kotlin and kotlinx libraries (serialization, coroutines), AndroidX/Jetpack (Compose, Lifecycle,
+  Navigation, Room, Core KTX, Activity), Square's Retrofit and OkHttp, Coil, and JUnit4. Consult
+  each library's own repository for its exact license text.
+- App icons are inline `ImageVector`s built from Material Symbols path data (`TasteIndiaIcons`),
+  used in place of pinning `androidx.compose.material:material-icons-core` (frozen at an older
+  version and no longer managed by the Compose BOM).
 
-This project was implemented **with AI assistance (Claude, in an agentic coding CLI)** across the
-10 phases in `PROMPT`/the task brief. See [`AI_DISCLOSURE.md`](AI_DISCLOSURE.md) for what the AI
-did, what was human‑directed, and which decisions to be ready to explain in review.
+## Time Spent
+
+Roughly **9–11 hours** of equivalent development effort across the original build (data layer,
+recipe list, search/filters/sort, details, favourites, reliability hardening, tests, and docs),
+plus an additional focused pass (~1–1.5 hours) for an independent review round that fixed two
+issues found in the favourites/Indian-boundary and Room-failure-handling code paths. This is an
+approximate figure, not a tracked timesheet.
+
+## AI / Tool Use
+
+This project was built with AI assistance — Claude Code (Anthropic's agentic coding CLI) for
+implementation, and Gemini for an independent second-pass review of the finished implementation.
+AI involvement is not hidden: every phase was human-directed, each AI-authored change was reviewed
+before being built/tested/committed, and Gemini's review findings were independently verified
+against the actual code (not applied automatically) before any fix was made. See
+[`AI_DISCLOSURE.md`](AI_DISCLOSURE.md) for the detailed disclosure, including which decisions were
+AI judgement calls that a reviewer should be ready to see explained.
+
+## Submission Notes
+
+From a fresh checkout:
+
+```bash
+./gradlew clean assembleDebug        # build the debug APK
+./gradlew testDebugUnitTest          # run the 61 JVM unit tests (no device needed)
+./gradlew connectedDebugAndroidTest  # run the 7 Room instrumented tests (needs a device/emulator)
+./gradlew installDebug               # install on a running emulator/device
+```
+
+No API key, secret, or `local.properties` entry is required — TheMealDB v1 is a free public API
+and the app only needs internet access on the device/emulator to reach it. Opening the project
+root in Android Studio and syncing Gradle is equivalent to the manual steps above.
