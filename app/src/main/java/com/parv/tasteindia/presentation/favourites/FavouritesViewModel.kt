@@ -24,8 +24,14 @@ import kotlinx.coroutines.launch
 /**
  * The separate Favourites destination. Persistence is entirely Room ([FavouritesRepository]);
  * this VM just turns the observed id set into displayable rows, resolving each id from the
- * Indian base set and, failing that, the cached detail — so it still shows something with no
- * network as long as the meal has been seen before.
+ * Indian base set and, failing that, this app's own cached detail — so it still shows something
+ * with no network as long as the meal has been seen before.
+ *
+ * An id outside the current base set is deliberately NOT re-validated with a fresh network
+ * lookup: [MealRepository.getMealDetail] doesn't check Indian membership, so treating its
+ * success as proof would let a non-Indian id (or one that TheMealDB has since reclassified out of
+ * the area) back into the app. Only [MealRepository.getCachedMealDetail] — this app's own prior
+ * cache, never a live call — is used as the fallback.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class FavouritesViewModel(
@@ -72,8 +78,9 @@ class FavouritesViewModel(
                 base[id]?.let { meal ->
                     return@mapNotNull RecipeListItem(meal.id, meal.name, meal.thumbnailUrl, isFavourite = true)
                 }
-                // Not in the base set (offline, or an old favourite): try the cached detail.
-                mealRepository.getMealDetail(id).getOrNull()?.let { detail ->
+                // Not in the base set (offline, or an old favourite): try this app's own cached
+                // detail. Never falls back to a fresh network lookup — see class doc.
+                mealRepository.getCachedMealDetail(id)?.let { detail ->
                     RecipeListItem(detail.id, detail.name, detail.thumbnailUrl, isFavourite = true)
                 }
             }

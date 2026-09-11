@@ -1,5 +1,8 @@
 package com.parv.tasteindia.presentation.favourites
 
+import com.parv.tasteindia.data.local.CachedMealDetailEntity
+import com.parv.tasteindia.data.remote.dto.MealDetailDto
+import com.parv.tasteindia.data.remote.dto.MealDetailResponseDto
 import com.parv.tasteindia.data.remote.dto.MealListResponseDto
 import com.parv.tasteindia.data.remote.dto.MealSummaryDto
 import com.parv.tasteindia.data.repository.MealRepositoryImpl
@@ -13,7 +16,9 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.encodeToString
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 
@@ -34,10 +39,14 @@ class FavouritesViewModelTest {
         ),
     )
 
-    private fun viewModel(favourites: FakeFavouritesRepository) = FavouritesViewModel(
+    private fun viewModel(
+        favourites: FakeFavouritesRepository,
+        api: FakeMealApi = FakeMealApi(areaResponse = indianBase),
+        cacheDao: FakeCachedMealDetailDao = FakeCachedMealDetailDao(),
+    ) = FavouritesViewModel(
         mealRepository = MealRepositoryImpl(
-            api = FakeMealApi(areaResponse = indianBase),
-            cacheDao = FakeCachedMealDetailDao(),
+            api = api,
+            cacheDao = cacheDao,
             json = Fixtures.json,
             ioDispatcher = mainDispatcherRule.dispatcher,
             scope = CoroutineScope(mainDispatcherRule.dispatcher),
@@ -96,6 +105,55 @@ class FavouritesViewModelTest {
             assertEquals(listOf("1"), state.meals.map { it.id })
             assertEquals(1, state.unresolvedCount)
             assertEquals(2, state.savedCount)
+            job.cancel()
+        }
+
+    @Test
+    fun `a favourite id outside the base set is never resolved via a live network lookup`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            // "999" is not Indian, but lookup.php would happily answer for it if called.
+            val api = FakeMealApi(
+                areaResponse = indianBase,
+                lookupResponses = mapOf(
+                    "999" to MealDetailResponseDto(
+                        meals = listOf(
+                            MealDetailDto(idMeal = "999", strMeal = "Fish and Chips", strArea = "British"),
+                        ),
+                    ),
+                ),
+            )
+            val vm = viewModel(FakeFavouritesRepository(setOf("1", "999")), api = api)
+            val job = launch { vm.uiState.collect {} }
+            advanceUntilIdle()
+
+            val state = vm.uiState.value
+            // Must stay unresolved, not silently show the foreign meal.
+            assertEquals(listOf("1"), state.meals.map { it.id })
+            assertEquals(1, state.unresolvedCount)
+            assertNull("getMealDetail/lookup.php must never be called for an unresolved favourite", api.lookupCallsById["999"])
+            job.cancel()
+        }
+
+    @Test
+    fun `a favourite id outside the base set resolves from this app's own cache, with no network call`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val cachedDetail = MealDetailDto(idMeal = "999", strMeal = "Old Favourite", strArea = "India")
+            val cacheDao = FakeCachedMealDetailDao().apply {
+                store["999"] = CachedMealDetailEntity(
+                    idMeal = "999",
+                    payloadJson = Fixtures.json.encodeToString(cachedDetail),
+                    cachedAt = 0L,
+                )
+            }
+            val api = FakeMealApi(areaResponse = indianBase)
+            val vm = viewModel(FakeFavouritesRepository(setOf("1", "999")), api = api, cacheDao = cacheDao)
+            val job = launch { vm.uiState.collect {} }
+            advanceUntilIdle()
+
+            val state = vm.uiState.value
+            assertEquals(listOf("Old Favourite", "Aloo Gobi").sorted(), state.meals.map { it.name }.sorted())
+            assertEquals(0, state.unresolvedCount)
+            assertNull("resolving from cache must not hit the network", api.lookupCallsById["999"])
             job.cancel()
         }
 }

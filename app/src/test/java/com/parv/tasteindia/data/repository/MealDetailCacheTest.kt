@@ -109,4 +109,45 @@ class MealDetailCacheTest {
 
         assertEquals(AppError.NotFound, (result as DataResult.Failure).error)
     }
+
+    @Test
+    fun `getCachedMealDetail never calls the network, even when a lookup response exists`() = runTest {
+        val api = FakeMealApi(lookupResponses = mapOf(mealId to normalLookup))
+        val (repository, _) = repo(api)
+
+        val result = repository.getCachedMealDetail(mealId)
+
+        assertEquals(null, result)
+        assertEquals(null, api.lookupCallsById[mealId])
+    }
+
+    @Test
+    fun `getCachedMealDetail reads a pre-populated Room cache with zero network calls`() = runTest {
+        val dao = FakeCachedMealDetailDao().apply {
+            store[mealId] = CachedMealDetailEntity(
+                idMeal = mealId,
+                payloadJson = Fixtures.json.encodeToString(normalDto),
+                cachedAt = 0L,
+            )
+        }
+        val api = FakeMealApi(lookupResponses = mapOf(mealId to normalLookup))
+        val (repository, _) = repo(api, dao)
+
+        val result = repository.getCachedMealDetail(mealId)
+
+        assertEquals("Chicken Handi", result?.name)
+        assertEquals(null, api.lookupCallsById[mealId])
+    }
+
+    @Test
+    fun `getCachedMealDetail is served from memory after a prior getMealDetail call`() = runTest {
+        val api = FakeMealApi(lookupResponses = mapOf(mealId to normalLookup))
+        val (repository, _) = repo(api)
+
+        repository.getMealDetail(mealId)
+        val result = repository.getCachedMealDetail(mealId)
+
+        assertEquals("Chicken Handi", result?.name)
+        assertEquals(1, api.lookupCallsById[mealId])
+    }
 }

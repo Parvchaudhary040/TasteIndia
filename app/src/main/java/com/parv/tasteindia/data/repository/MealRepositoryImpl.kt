@@ -44,6 +44,12 @@ import java.util.concurrent.ConcurrentHashMap
  *   - served from an in-memory map, then a Room row, before any network call;
  *   - de-duplicated: concurrent calls for the same id await one shared request;
  *   - bounded: at most [MAX_CONCURRENT_DETAIL_CALLS] detail requests run at once.
+ *
+ * [getMealDetail] itself is not boundary-aware — a raw `lookup.php` call will happily return any
+ * meal id that exists, Indian or not. It is only ever called with ids that already passed through
+ * the Indian base set / category-ingredient intersection upstream. Callers resolving an id of
+ * unknown provenance (e.g. a saved favourite) must use [getCachedMealDetail] instead, which never
+ * makes a network call and so can never launder a foreign id back in.
  */
 class MealRepositoryImpl(
     private val api: MealApi,
@@ -145,6 +151,9 @@ class MealRepositoryImpl(
         }
         return request.await()
     }
+
+    override suspend fun getCachedMealDetail(id: String): MealDetail? =
+        detailMemoryCache[id] ?: readDetailFromRoom(id)?.also { detailMemoryCache[id] = it }
 
     private suspend fun fetchAndCacheDetail(id: String): DataResult<MealDetail> =
         when (val response = safeApiCall { api.lookupById(id) }) {

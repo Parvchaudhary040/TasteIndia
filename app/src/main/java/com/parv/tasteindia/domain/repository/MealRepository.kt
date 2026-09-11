@@ -37,4 +37,15 @@ interface MealRepository {
      * when available; concurrent calls for the same id are de-duplicated.
      */
     suspend fun getMealDetail(id: String): DataResult<MealDetail>
+
+    /**
+     * [id]'s detail if this app has already fetched it (in-memory or Room cache), with no
+     * network fallback. A cache hit here is never proof of Indian membership by itself — every
+     * detail was cached by a prior [getMealDetail] call whose id came from an already
+     * Indian-gated source (the base set, or a category/ingredient intersection). Callers that
+     * need to resolve an id of unknown provenance (e.g. a saved favourite that has fallen out of
+     * the current base set) must use this instead of [getMealDetail], which would otherwise treat
+     * a fresh, unrestricted `lookup.php` response as if it proved the id belongs in TasteIndia.
+     */
+    suspend fun getCachedMealDetail(id: String): MealDetail?
 }
